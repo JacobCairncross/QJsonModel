@@ -31,6 +31,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QIcon>
+#include "patterntreeitem.h"
 
 namespace QUtf8Functions
 {
@@ -271,15 +272,21 @@ public:
     ~QJsonTreeItem();
     void appendChild(QJsonTreeItem * item);
     QJsonTreeItem *child(int row);
+    QJsonTreeItem *child(QString key);
+    bool hasChild(QString key);
     QJsonTreeItem *parent();
     int childCount() const;
     int row() const;
     void setKey(const QString& key);
     void setValue(const QVariant& value);
     void setType(const QJsonValue::Type& type);
+    void setCorrespondingPatternItem(PatternTreeItem* item);
     QString key() const;
     QVariant value() const;
     QJsonValue::Type type() const;
+    PatternTreeItem* correspondingPatternItem();
+    QJsonTreeItem* getChildlessCopy(QJsonTreeItem* parent) const;
+
 
     static QJsonTreeItem* load(const QJsonValue& value, QJsonTreeItem * parent = 0);
 
@@ -291,6 +298,7 @@ private:
     QJsonValue::Type mType;
     QList<QJsonTreeItem*> mChilds;
     QJsonTreeItem * mParent;
+    PatternTreeItem* mCorrespondingPatternItem = nullptr;
 };
 
 //---------------------------------------------------
@@ -308,6 +316,8 @@ public:
     bool load(QIODevice * device);
     bool loadJson(const QByteArray& json);
     QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
+    QJsonTreeItem* treeData(const QModelIndex &index);
+    QList<QJsonTreeItem*> getPathToRoot(const QModelIndex &index) const;
     bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) Q_DECL_OVERRIDE;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const Q_DECL_OVERRIDE;
     QModelIndex index(int row, int column,const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
@@ -317,15 +327,18 @@ public:
     Qt::ItemFlags flags(const QModelIndex &index) const Q_DECL_OVERRIDE;
     QByteArray json() ;
     QByteArray jsonToByte(QJsonValue jsonValue);
+    void setSelectedNodesRoot(QJsonTreeItem * selectedNodesRootItem);
     void objectToJson(QJsonObject jsonObject, QByteArray &json, int indent, bool compact);
     void arrayToJson(QJsonArray jsonArray, QByteArray &json, int indent, bool compact);
     void arrayContentToJson(QJsonArray jsonArray, QByteArray &json, int indent, bool compact);
     void objectContentToJson(QJsonObject jsonObject, QByteArray &json, int indent, bool compact);
     void valueToJson(QJsonValue jsonValue, QByteArray &json, int indent, bool compact);
+    QJsonValue genJson(QJsonTreeItem *) const;
+
 
 private:
-    QJsonValue genJson(QJsonTreeItem *) const;
     QJsonTreeItem * mRootItem;
+    QJsonTreeItem * selectedNodesRootItem;
     QStringList mHeaders;
 };
 

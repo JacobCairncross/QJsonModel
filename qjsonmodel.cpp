@@ -31,6 +31,7 @@
 QJsonTreeItem::QJsonTreeItem(QJsonTreeItem *parent)
 {
     mParent = parent;
+    mChilds = QList<QJsonTreeItem*>();
 }
 
 QJsonTreeItem::~QJsonTreeItem()
@@ -47,6 +48,26 @@ QJsonTreeItem *QJsonTreeItem::child(int row)
 {
     return mChilds.value(row);
 }
+
+QJsonTreeItem *QJsonTreeItem::child(QString key){
+    for(int i = 0; i<mChilds.count(); i++){
+        if(mChilds[i]->key() == key){
+            return mChilds[i];
+        }
+    }
+    return new QJsonTreeItem();
+}
+
+
+bool QJsonTreeItem::hasChild(QString key){
+    for(int i = 0; i<this->mChilds.length(); i++){
+        if(this->mChilds[i]->key() == key){
+            return true;
+        }
+    }
+    return false;
+}
+
 
 QJsonTreeItem *QJsonTreeItem::parent()
 {
@@ -81,6 +102,11 @@ void QJsonTreeItem::setType(const QJsonValue::Type &type)
     mType = type;
 }
 
+void QJsonTreeItem::setCorrespondingPatternItem(PatternTreeItem* item){
+    mCorrespondingPatternItem = item;
+}
+
+
 QString QJsonTreeItem::key() const
 {
     return mKey;
@@ -94,6 +120,19 @@ QVariant QJsonTreeItem::value() const
 QJsonValue::Type QJsonTreeItem::type() const
 {
     return mType;
+}
+
+PatternTreeItem* QJsonTreeItem::correspondingPatternItem(){
+    return mCorrespondingPatternItem;
+}
+
+QJsonTreeItem* QJsonTreeItem::getChildlessCopy(QJsonTreeItem* parent) const
+{
+    QJsonTreeItem* copyItem = new QJsonTreeItem(parent);
+    copyItem->setType(mType);
+    copyItem->setKey(mKey);
+    copyItem->setValue(mValue);
+    return copyItem;
 }
 
 QJsonTreeItem* QJsonTreeItem::load(const QJsonValue& value, QJsonTreeItem* parent)
@@ -137,6 +176,18 @@ QJsonTreeItem* QJsonTreeItem::load(const QJsonValue& value, QJsonTreeItem* paren
 
     return rootItem;
 }
+
+//void QJsonTreeItem::saveTree(QString filename) const{
+//    QFile file(filename);
+//    if(!file.open(QFile::WriteOnly | QFile::Text)){
+//        return;
+//    }
+//    QTextStream out(&file);
+//    QString text = ui->solidityCodeContainer->toPlainText();
+//    out << text;
+//    file.close();
+//}
+
 
 //=========================================================================
 
@@ -324,10 +375,35 @@ QVariant QJsonModel::data(const QModelIndex &index, int role) const
             return item->value();
         }
     }
+    else if(role == Qt::BackgroundRole && selectedNodesRootItem != NULL){//Double check that the default is null here
+        QList<QJsonTreeItem*> pathToRoot = getPathToRoot(index);
+        QJsonTreeItem* selectedItemsNode = selectedNodesRootItem;
+        //length-1 is the root node so we can skip that
+        for(int i=pathToRoot.length()-2;i>=0;i--){
+            if(selectedItemsNode->hasChild(pathToRoot[i]->key())){
+                selectedItemsNode = selectedItemsNode->child(pathToRoot[i]->key());
+            }
+            else{
+                return QColor(Qt::white);
+            }
+        }
+        return QColor(0,255,0,100);
+    }
 
     return QVariant();
 
 }
+
+QJsonTreeItem* QJsonModel::treeData(const QModelIndex &index)
+{
+    if (!index.isValid())
+        return nullptr;
+
+
+    return static_cast<QJsonTreeItem*>(index.internalPointer());
+
+}
+
 
 bool QJsonModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
@@ -445,6 +521,29 @@ QByteArray QJsonModel::json()
     }
     return json;
 }
+
+QByteArray QJsonModel::jsonToByte(QJsonValue jsonValue)
+{
+    QByteArray json;
+    if (jsonValue.isNull())
+    {
+        return json;
+    }
+    if (jsonValue.isArray())
+    {
+        arrayToJson(jsonValue.toArray(), json, 0, false);
+    }
+    else
+    {
+        objectToJson(jsonValue.toObject(), json, 0, false);
+    }
+    return json;
+}
+
+void QJsonModel::setSelectedNodesRoot(QJsonTreeItem * selectedNodesRootItem){
+    this->selectedNodesRootItem = selectedNodesRootItem;
+}
+
 
 void QJsonModel::objectToJson(QJsonObject jsonObject, QByteArray &json, int indent, bool compact)
 {
@@ -589,3 +688,14 @@ QJsonValue  QJsonModel::genJson(QJsonTreeItem * item) const
     }
 
 }
+
+QList<QJsonTreeItem*> QJsonModel::getPathToRoot(const QModelIndex &index) const{
+    QList<QJsonTreeItem*> pathToRoot = QList<QJsonTreeItem*>();
+    QJsonTreeItem* currentNode = static_cast<QJsonTreeItem*>(index.internalPointer());;
+    while(currentNode != nullptr){
+        pathToRoot.append(currentNode);
+        currentNode = currentNode->parent();
+    }
+    return pathToRoot;
+}
+
